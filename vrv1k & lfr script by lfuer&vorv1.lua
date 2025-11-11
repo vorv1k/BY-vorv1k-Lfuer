@@ -1,4 +1,3 @@
--- Сервисы
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -68,7 +67,7 @@ local function createGUI()
     end
     
     screenGui = Instance.new("ScreenGui")
-    screenGui.Name = HttpService:GenerateGUID(false)
+    screenGui.Name = "WinterESP"
     screenGui.Parent = CoreGui
     screenGui.DisplayOrder = 999
     screenGui.ResetOnSpawn = false
@@ -195,6 +194,16 @@ local function findFPVDrones()
         end
     end
     
+    if Settings.ESP.ShowDrones then
+        local droneCount = 0
+        for _ in pairs(drones) do
+            droneCount = droneCount + 1
+        end
+        if droneCount > 0 then
+            print("🔍 Найдено FPV дронов: " .. droneCount)
+        end
+    end
+    
     return drones
 end
 
@@ -276,7 +285,7 @@ local function applyChams(target)
     if not Settings.Visuals.Chams then return end
     
     local highlight = Instance.new("Highlight")
-    highlight.Name = HttpService:GenerateGUID(false)
+    highlight.Name = "Chams"
     highlight.Adornee = target
     highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
     highlight.FillColor = Settings.Visuals.ChamsColor
@@ -299,7 +308,7 @@ local function createModelOutline(target)
     if not target then return nil end
     
     local highlight = Instance.new("Highlight")
-    highlight.Name = HttpService:GenerateGUID(false)
+    highlight.Name = "ESP_Outline"
     highlight.Adornee = target.Object
     highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
     highlight.FillTransparency = 0.95
@@ -346,7 +355,7 @@ local function createESP(target)
     if espCache[target.Object] then return end
     
     local espFrame = Instance.new("Frame")
-    espFrame.Name = HttpService:GenerateGUID(false)
+    espFrame.Name = "ESP_" .. target.Object.Name
     espFrame.BackgroundTransparency = 1
     espFrame.Size = UDim2.new(1, 0, 1, 0)
     espFrame.ZIndex = 10
@@ -1056,7 +1065,7 @@ local function createCheatMenu()
     end
     
     local mainFrameInstance = Instance.new("Frame")
-    mainFrameInstance.Name = HttpService:GenerateGUID(false)
+    mainFrameInstance.Name = "WinterESP"
     mainFrameInstance.Size = UDim2.new(0, 350, 0, 500)
     mainFrameInstance.Position = UDim2.new(0.02, 0, 0.02, 0)
     mainFrameInstance.BackgroundColor3 = COLORS.Background
@@ -1116,7 +1125,7 @@ local function createCheatMenu()
     minimizeStroke.Parent = minimizeButton
     
     local title = Instance.new("TextLabel")
-    title.Text = "Winter ESP"
+    title.Text = "vrv1k & lfr script."
     title.Size = UDim2.new(1, -40, 0.6, 0)
     title.Position = UDim2.new(0, 10, 0, 0)
     title.BackgroundTransparency = 1
@@ -1127,7 +1136,7 @@ local function createCheatMenu()
     title.Parent = titleBar
     
     local subtitle = Instance.new("TextLabel")
-    subtitle.Text = "Premium Version"
+    subtitle.Text = "by Vorv1k & lfuer"
     subtitle.Size = UDim2.new(1, -40, 0.4, 0)
     subtitle.Position = UDim2.new(0, 10, 0.6, 0)
     subtitle.BackgroundTransparency = 1
@@ -1205,46 +1214,46 @@ local function createCheatMenu()
     local espContent = contentFrames["ESP"]
     local yPos = 0
     createToggle("ESP Включено", Settings.ESP, "Enabled", yPos, espContent)
-    yPos += 40
+    yPos = yPos + 40
     createToggle("Показывать врагов", Settings.ESP, "ShowEnemies", yPos, espContent)
-    yPos += 40
+    yPos = yPos + 40
     createToggle("Показывать дронов", Settings.ESP, "ShowDrones", yPos, espContent)
-    yPos += 40
+    yPos = yPos + 40
     createToggle("Показывать имена", Settings.ESP, "ShowNames", yPos, espContent)
-    yPos += 40
+    yPos = yPos + 40
     createSlider("Дальность ESP", Settings.ESP, "MaxDistance", 100, 2000, yPos, espContent)
-    yPos += 55
+    yPos = yPos + 55
     createSlider("Дальность дронов", Settings.ESP, "DroneDistance", 100, 1000, yPos, espContent)
-    yPos += 55
+    yPos = yPos + 55
     
     espContent.CanvasSize = UDim2.new(0, 0, 0, yPos)
     
     local visualsContent = contentFrames["Visuals"]
     yPos = 0
     createToggle("Обводка моделей", Settings.Visuals, "OutlineModels", yPos, visualsContent)
-    yPos += 40
+    yPos = yPos + 40
     createToggle("Показывать здоровье", Settings.Visuals, "ShowHealth", yPos, visualsContent)
-    yPos += 40
+    yPos = yPos + 40
     createToggle("Показывать дистанцию", Settings.Visuals, "ShowDistance", yPos, visualsContent)
-    yPos += 40
+    yPos = yPos + 40
     createToggle("Chams", Settings.Visuals, "Chams", yPos, visualsContent)
-    yPos += 40
+    yPos = yPos + 40
     createToggle("X-Ray", Settings.Visuals, "XRay", yPos, visualsContent)
-    yPos += 40
+    yPos = yPos + 40
     
     createSettingsButton(yPos, visualsContent, function()
         colorEditor.Visible = true
     end)
-    yPos += 45
+    yPos = yPos + 45
     
     visualsContent.CanvasSize = UDim2.new(0, 0, 0, yPos)
     
     local miscContent = contentFrames["Misc"]
     yPos = 0
     createToggle("Изменение FOV", Settings.FOV, "Enabled", yPos, miscContent)
-    yPos += 40
+    yPos = yPos + 40
     createSlider("Значение FOV", Settings.FOV, "Value", 30, 120, yPos, miscContent)
-    yPos += 55
+    yPos = yPos + 55
     
     miscContent.CanvasSize = UDim2.new(0, 0, 0, yPos)
     
@@ -1398,13 +1407,15 @@ local function main()
         updateFOV()
     end)
     
-    print("🟢 Winter ESP загружена!")
+    print("🟢 vrv1k & lfr script. загружена!")
     print("🎮 Горячие клавиши:")
     print("   ESC - Показать/скрыть меню")
     print("   INSERT - Включить/выключить ESP")
     print("   HOME - Включить/выключить Chams")
     print("   END - Включить/выключить X-Ray")
     print("   PAGE UP - Включить/выключить ESP дронов")
+    print("🎨 Упрощенный редактор цветов доступен в разделе Visuals")
+    print("С уважением Lfuer&Vorv1k")
 end
 
 main()
