@@ -852,10 +852,35 @@ local function createColorEditor()
     editorStroke.Thickness = 2
     editorStroke.Parent = colorEditor
     
+    -- Маленькая кнопка закрытия в левом верхнем углу
+    local closeButton = Instance.new("TextButton")
+    closeButton.Text = "×"
+    closeButton.Size = UDim2.new(0, 25, 0, 25)
+    closeButton.Position = UDim2.new(0, 5, 0, 5)
+    closeButton.BackgroundColor3 = COLORS.Error
+    closeButton.TextColor3 = COLORS.Primary
+    closeButton.Font = Enum.Font.GothamBlack
+    closeButton.TextSize = 18
+    closeButton.ZIndex = 101
+    closeButton.Parent = colorEditor
+    
+    local closeCorner = Instance.new("UICorner")
+    closeCorner.CornerRadius = UDim.new(1, 0)
+    closeCorner.Parent = closeButton
+    
+    local closeStroke = Instance.new("UIStroke")
+    closeStroke.Color = COLORS.Border
+    closeStroke.Thickness = 1
+    closeStroke.Parent = closeButton
+    
+    closeButton.MouseButton1Click:Connect(function()
+        colorEditor.Visible = false
+    end)
+    
     local title = Instance.new("TextLabel")
     title.Text = "🎨 Редактор цветов"
-    title.Size = UDim2.new(1, -20, 0, 40)
-    title.Position = UDim2.new(0, 10, 0, 10)
+    title.Size = UDim2.new(1, -40, 0, 40)
+    title.Position = UDim2.new(0, 35, 0, 10)
     title.BackgroundTransparency = 1
     title.TextColor3 = COLORS.Primary
     title.Font = Enum.Font.GothamBlack
@@ -879,111 +904,92 @@ local function createColorEditor()
     previewStroke.Thickness = 2
     previewStroke.Parent = colorPreview
     
-    local basicColors = {
-        {Color = Color3.new(1, 0, 0), Name = "Красный"},
-        {Color = Color3.new(0, 1, 0), Name = "Зеленый"},
-        {Color = Color3.new(0, 0, 1), Name = "Синий"},
-        {Color = Color3.new(1, 1, 0), Name = "Желтый"},
-        {Color = Color3.new(1, 0, 1), Name = "Пурпурный"},
-        {Color = Color3.new(0, 1, 1), Name = "Голубой"},
-        {Color = Color3.new(1, 1, 1), Name = "Белый"},
-        {Color = Color3.new(0, 0, 0), Name = "Черный"}
+    -- Основная палитра цветов
+    local colorPalette = Instance.new("Frame")
+    colorPalette.Size = UDim2.new(1, -20, 0, 200)
+    colorPalette.Position = UDim2.new(0, 10, 0, 80)
+    colorPalette.BackgroundTransparency = 1
+    colorPalette.ZIndex = 101
+    colorPalette.Parent = colorEditor
+    
+    -- Создаем палитру 8x8 цветов
+    local colors = {
+        -- Красные оттенки
+        Color3.fromRGB(255, 0, 0), Color3.fromRGB(255, 50, 50), Color3.fromRGB(255, 100, 100), Color3.fromRGB(255, 150, 150),
+        Color3.fromRGB(200, 0, 0), Color3.fromRGB(200, 50, 50), Color3.fromRGB(200, 100, 100), Color3.fromRGB(200, 150, 150),
+        
+        -- Зеленые оттенки
+        Color3.fromRGB(0, 255, 0), Color3.fromRGB(50, 255, 50), Color3.fromRGB(100, 255, 100), Color3.fromRGB(150, 255, 150),
+        Color3.fromRGB(0, 200, 0), Color3.fromRGB(50, 200, 50), Color3.fromRGB(100, 200, 100), Color3.fromRGB(150, 200, 150),
+        
+        -- Синие оттенки
+        Color3.fromRGB(0, 0, 255), Color3.fromRGB(50, 50, 255), Color3.fromRGB(100, 100, 255), Color3.fromRGB(150, 150, 255),
+        Color3.fromRGB(0, 0, 200), Color3.fromRGB(50, 50, 200), Color3.fromRGB(100, 100, 200), Color3.fromRGB(150, 150, 200),
+        
+        -- Желтые/Оранжевые
+        Color3.fromRGB(255, 255, 0), Color3.fromRGB(255, 200, 0), Color3.fromRGB(255, 150, 0), Color3.fromRGB(255, 100, 0),
+        Color3.fromRGB(200, 200, 0), Color3.fromRGB(200, 150, 0), Color3.fromRGB(200, 100, 0), Color3.fromRGB(200, 50, 0),
+        
+        -- Пурпурные/Розовые
+        Color3.fromRGB(255, 0, 255), Color3.fromRGB(255, 50, 200), Color3.fromRGB(255, 100, 150), Color3.fromRGB(255, 150, 200),
+        Color3.fromRGB(200, 0, 200), Color3.fromRGB(200, 50, 150), Color3.fromRGB(200, 100, 100), Color3.fromRGB(200, 150, 150),
+        
+        -- Голубые/Бирюзовые
+        Color3.fromRGB(0, 255, 255), Color3.fromRGB(50, 255, 200), Color3.fromRGB(100, 255, 150), Color3.fromRGB(150, 255, 200),
+        Color3.fromRGB(0, 200, 200), Color3.fromRGB(50, 200, 150), Color3.fromRGB(100, 200, 100), Color3.fromRGB(150, 200, 150),
+        
+        -- Фиолетовые
+        Color3.fromRGB(128, 0, 255), Color3.fromRGB(150, 50, 255), Color3.fromRGB(180, 100, 255), Color3.fromRGB(200, 150, 255),
+        Color3.fromRGB(100, 0, 200), Color3.fromRGB(120, 50, 200), Color3.fromRGB(150, 100, 200), Color3.fromRGB(180, 150, 200),
+        
+        -- Серые/Белые/Черные
+        Color3.fromRGB(255, 255, 255), Color3.fromRGB(200, 200, 200), Color3.fromRGB(150, 150, 150), Color3.fromRGB(100, 100, 100),
+        Color3.fromRGB(50, 50, 50), Color3.fromRGB(0, 0, 0), Color3.fromRGB(128, 128, 128), Color3.fromRGB(180, 180, 180)
     }
     
-    local basicColorsFrame = Instance.new("Frame")
-    basicColorsFrame.Size = UDim2.new(1, -20, 0, 40)
-    basicColorsFrame.Position = UDim2.new(0, 10, 1, -120)
-    basicColorsFrame.BackgroundTransparency = 1
-    basicColorsFrame.ZIndex = 101
-    basicColorsFrame.Parent = colorEditor
+    local colorNames = {
+        "Красный", "Светло-красный", "Розовый", "Светло-розовый",
+        "Темно-красный", "Красно-оранжевый", "Коралловый", "Персиковый",
+        
+        "Зеленый", "Светло-зеленый", "Лаймовый", "Мятный",
+        "Темно-зеленый", "Оливковый", "Фисташковый", "Салатовый",
+        
+        "Синий", "Светло-синий", "Голубой", "Небесный",
+        "Темно-синий", "Сине-фиолетовый", "Лавандовый", "Серо-голубой",
+        
+        "Желтый", "Золотой", "Оранжевый", "Красно-оранжевый",
+        "Темно-желтый", "Янтарный", "Оранжево-красный", "Кирпичный",
+        
+        "Пурпурный", "Розовый", "Фуксия", "Светло-розовый",
+        "Темно-пурпурный", "Фиолетово-розовый", "Лососевый", "Кораллово-розовый",
+        
+        "Бирюзовый", "Аквамарин", "Морской волны", "Светло-бирюзовый",
+        "Темно-бирюзовый", "Зелено-голубой", "Оливково-зеленый", "Светло-зеленый",
+        
+        "Фиолетовый", "Светло-фиолетовый", "Лавандовый", "Сиреневый",
+        "Темно-фиолетовый", "Сливовый", "Серо-фиолетовый", "Светло-сиреневый",
+        
+        "Белый", "Светло-серый", "Серый", "Темно-серый",
+        "Черный", "Чистый черный", "Средне-серый", "Серебряный"
+    }
     
-    for i, colorData in ipairs(basicColors) do
-        local colorButton = Instance.new("TextButton")
-        colorButton.Size = UDim2.new(0, 30, 0, 30)
-        colorButton.Position = UDim2.new(0, (i-1) * 35, 0, 0)
-        colorButton.BackgroundColor3 = colorData.Color
-        colorButton.BorderSizePixel = 0
-        colorButton.AutoButtonColor = false
-        colorButton.Text = ""
-        colorButton.ZIndex = 102
-        colorButton.Parent = basicColorsFrame
-        
-        local colorCorner = Instance.new("UICorner")
-        colorCorner.CornerRadius = UDim.new(0, 6)
-        colorCorner.Parent = colorButton
-        
-        local colorStroke = Instance.new("UIStroke")
-        colorStroke.Color = COLORS.Primary
-        colorStroke.Thickness = 1
-        colorStroke.Parent = colorButton
-        
-        local tooltip = Instance.new("TextLabel")
-        tooltip.Text = colorData.Name
-        tooltip.Size = UDim2.new(0, 60, 0, 20)
-        tooltip.Position = UDim2.new(0, -15, -25, 0)
-        tooltip.BackgroundColor3 = COLORS.Surface
-        tooltip.TextColor3 = COLORS.Primary
-        tooltip.Font = Enum.Font.Gotham
-        tooltip.TextSize = 10
-        tooltip.Visible = false
-        tooltip.ZIndex = 103
-        tooltip.Parent = colorButton
-        
-        local tooltipCorner = Instance.new("UICorner")
-        tooltipCorner.CornerRadius = UDim.new(0, 4)
-        tooltipCorner.Parent = tooltip
-        
-        colorButton.MouseEnter:Connect(function()
-            tooltip.Visible = true
-        end)
-        
-        colorButton.MouseLeave:Connect(function()
-            tooltip.Visible = false
-        end)
-        
-        colorButton.MouseButton1Click:Connect(function()
-            Settings.Visuals.ChamsColor = colorData.Color
-            colorPreview.BackgroundColor3 = colorData.Color
-            
-            for target, _ in pairs(espCache) do
-                if chamsCache[target] then
-                    chamsCache[target].FillColor = colorData.Color
-                    chamsCache[target].OutlineColor = colorData.Color
-                end
-            end
-        end)
-    end
-    
-    local colorGrid = Instance.new("Frame")
-    colorGrid.Size = UDim2.new(1, -20, 0, 200)
-    colorGrid.Position = UDim2.new(0, 10, 0, 60)
-    colorGrid.BackgroundTransparency = 1
-    colorGrid.ZIndex = 101
-    colorGrid.Parent = colorEditor
-    
-    local cellSize = 25
-    local spacing = 3
+    local cellSize = 35
+    local spacing = 2
     local colorsPerRow = 8
-
-    for i = 0, 63 do
-        local row = math.floor(i / colorsPerRow)
-        local col = i % colorsPerRow
-        
-        local hue = (i % colorsPerRow) / colorsPerRow
-        local saturation = 1.0
-        local lightness = 1.0 - (row / colorsPerRow) * 0.7
-        
-        local color = Color3.fromHSV(hue, saturation, lightness)
+    
+    for i = 1, #colors do
+        local row = math.floor((i-1) / colorsPerRow)
+        local col = (i-1) % colorsPerRow
         
         local colorCell = Instance.new("TextButton")
         colorCell.Size = UDim2.new(0, cellSize, 0, cellSize)
         colorCell.Position = UDim2.new(0, col * (cellSize + spacing), 0, row * (cellSize + spacing))
-        colorCell.BackgroundColor3 = color
+        colorCell.BackgroundColor3 = colors[i]
         colorCell.BorderSizePixel = 0
         colorCell.AutoButtonColor = false
         colorCell.Text = ""
         colorCell.ZIndex = 102
-        colorCell.Parent = colorGrid
+        colorCell.Parent = colorPalette
         
         local cellCorner = Instance.new("UICorner")
         cellCorner.CornerRadius = UDim.new(0, 4)
@@ -994,41 +1000,50 @@ local function createColorEditor()
         cellStroke.Thickness = 1
         cellStroke.Parent = colorCell
         
+        local tooltip = Instance.new("TextLabel")
+        tooltip.Text = colorNames[i]
+        tooltip.Size = UDim2.new(0, 80, 0, 20)
+        tooltip.Position = UDim2.new(0, -40, -25, 0)
+        tooltip.BackgroundColor3 = COLORS.Surface
+        tooltip.TextColor3 = COLORS.Primary
+        tooltip.Font = Enum.Font.Gotham
+        tooltip.TextSize = 10
+        tooltip.Visible = false
+        tooltip.ZIndex = 103
+        tooltip.Parent = colorCell
+        
+        local tooltipCorner = Instance.new("UICorner")
+        tooltipCorner.CornerRadius = UDim.new(0, 4)
+        tooltipCorner.Parent = tooltip
+        
+        colorCell.MouseEnter:Connect(function()
+            tooltip.Visible = true
+        end)
+        
+        colorCell.MouseLeave:Connect(function()
+            tooltip.Visible = false
+        end)
+        
         colorCell.MouseButton1Click:Connect(function()
-            Settings.Visuals.ChamsColor = color
-            colorPreview.BackgroundColor3 = color
+            Settings.Visuals.ChamsColor = colors[i]
+            colorPreview.BackgroundColor3 = colors[i]
             
             for target, _ in pairs(espCache) do
                 if chamsCache[target] then
-                    chamsCache[target].FillColor = color
-                    chamsCache[target].OutlineColor = color
+                    chamsCache[target].FillColor = colors[i]
+                    chamsCache[target].OutlineColor = colors[i]
                 end
             end
         end)
     end
     
-    local closeButton = Instance.new("TextButton")
-    closeButton.Text = "Закрыть"
-    closeButton.Size = UDim2.new(1, -20, 0, 35)
-    closeButton.Position = UDim2.new(0, 10, 1, -70)
-    closeButton.BackgroundColor3 = COLORS.Surface
-    closeButton.TextColor3 = COLORS.Primary
-    closeButton.Font = Enum.Font.GothamBold
-    closeButton.TextSize = 14
-    closeButton.ZIndex = 101
-    closeButton.Parent = colorEditor
-    
-    local closeCorner = Instance.new("UICorner")
-    closeCorner.CornerRadius = UDim.new(0, 8)
-    closeCorner.Parent = closeButton
-    
-    local closeStroke = Instance.new("UIStroke")
-    closeStroke.Color = COLORS.Border
-    closeStroke.Thickness = 1
-    closeStroke.Parent = closeButton
-    
-    closeButton.MouseButton1Click:Connect(function()
-        colorEditor.Visible = false
+    -- Добавляем возможность закрытия по ESC
+    UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
+        
+        if input.KeyCode == Enum.KeyCode.Escape and colorEditor.Visible then
+            colorEditor.Visible = false
+        end
     end)
     
     return colorEditor
@@ -1341,24 +1356,7 @@ local function setupRespawn()
     local function onCharacterAdded(character)
         if character:WaitForChild("Humanoid") then
             wait(1)
-            
-            for target, data in pairs(espCache) do
-                if data.Outline then
-                    data.Outline:Destroy()
-                end
-                data.Frame:Destroy()
-            end
-            espCache = {}
-            
-            for target, highlight in pairs(chamsCache) do
-                highlight:Destroy()
-            end
-            chamsCache = {}
-            
             camera = workspace.CurrentCamera
-            
-            createGUI()
-            createCheatMenu()
         end
     end
     
