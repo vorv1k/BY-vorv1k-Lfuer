@@ -311,13 +311,28 @@ local function createModelOutline(target)
     highlight.Name = "ESP_Outline"
     highlight.Adornee = target.Object
     highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-    highlight.FillTransparency = 0.95
-    highlight.OutlineColor = Settings.Visuals.ChamsColor
+    highlight.FillTransparency = 1.0  -- Полностью прозрачная заливка
+    highlight.OutlineColor = target.Type == "Drone" and COLORS.Warning or Settings.Visuals.ChamsColor
     highlight.OutlineTransparency = 0
-    highlight.FillColor = Settings.Visuals.ChamsColor
-    highlight.Parent = target.Object
+    highlight.FillColor = target.Type == "Drone" and COLORS.Warning or Settings.Visuals.ChamsColor
+    highlight.Parent = screenGui  -- Родитель должен быть ScreenGui
     
     return highlight
+end
+
+local function createBoxESP(target)
+    if not target or not target.Object then return nil end
+    
+    local boxFrame = Instance.new("Frame")
+    boxFrame.Name = "BoxESP_" .. target.Object.Name
+    boxFrame.BackgroundTransparency = 1
+    boxFrame.BorderSizePixel = 2
+    boxFrame.BorderColor3 = target.Type == "Drone" and COLORS.Warning or Settings.Visuals.ChamsColor
+    boxFrame.ZIndex = 10
+    boxFrame.Visible = false
+    boxFrame.Parent = screenGui
+    
+    return boxFrame
 end
 
 local function smoothUpdatePosition(espFrame, targetPosition, alpha)
@@ -362,7 +377,11 @@ local function createESP(target)
     espFrame.Visible = false
     espFrame.Parent = screenGui
     
+    -- Создаем обводку для модели
     local outline = Settings.Visuals.OutlineModels and createModelOutline(target)
+    
+    -- Создаем Box ESP
+    local boxESP = createBoxESP(target)
     
     if Settings.Visuals.Chams then
         applyChams(target.Object)
@@ -437,11 +456,33 @@ local function createESP(target)
         Frame = espFrame,
         Target = target,
         Outline = outline,
+        BoxESP = boxESP,
         LastUpdate = 0,
         SmoothPosition = UDim2.new(0, 0, 0, 0),
         LastScreenPos = Vector2.new(0, 0),
         HealthPercent = 1.0
     }
+end
+
+local function updateBoxESP(boxFrame, character, screenPos, size)
+    if not boxFrame or not character then return end
+    
+    local head = character:FindFirstChild("Head")
+    local rootPart = character:FindFirstChild("HumanoidRootPart")
+    
+    if not head or not rootPart then return end
+    
+    local headPos, headOnScreen = camera:WorldToViewportPoint(head.Position)
+    local rootPos, rootOnScreen = camera:WorldToViewportPoint(rootPart.Position)
+    
+    if not headOnScreen or not rootOnScreen then return end
+    
+    local height = math.abs(headPos.Y - rootPos.Y) * 1.2
+    local width = height * 0.6
+    
+    boxFrame.Size = UDim2.new(0, width, 0, height)
+    boxFrame.Position = UDim2.new(0, headPos.X - width/2, 0, headPos.Y - height/3)
+    boxFrame.Visible = true
 end
 
 local function updateESP(targetData)
@@ -451,7 +492,10 @@ local function updateESP(targetData)
     if not target or not target.Parent then
         espFrame.Visible = false
         if targetData.Outline then
-            targetData.Outline:Destroy()
+            targetData.Outline.Enabled = false
+        end
+        if targetData.BoxESP then
+            targetData.BoxESP.Visible = false
         end
         removeChams(target)
         return false
@@ -461,7 +505,10 @@ local function updateESP(targetData)
     if not rootPart then
         espFrame.Visible = false
         if targetData.Outline then
-            targetData.Outline:Destroy()
+            targetData.Outline.Enabled = false
+        end
+        if targetData.BoxESP then
+            targetData.BoxESP.Visible = false
         end
         removeChams(target)
         return false
@@ -474,7 +521,10 @@ local function updateESP(targetData)
     if not success then
         espFrame.Visible = false
         if targetData.Outline then
-            targetData.Outline:Destroy()
+            targetData.Outline.Enabled = false
+        end
+        if targetData.BoxESP then
+            targetData.BoxESP.Visible = false
         end
         removeChams(target)
         return false
@@ -486,11 +536,23 @@ local function updateESP(targetData)
     if Settings.ESP.Enabled and onScreen and distance <= maxDistance then
         if targetData.Target.Type == "Enemy" and not Settings.ESP.ShowEnemies then
             espFrame.Visible = false
+            if targetData.Outline then
+                targetData.Outline.Enabled = false
+            end
+            if targetData.BoxESP then
+                targetData.BoxESP.Visible = false
+            end
             return false
         end
         
         if targetData.Target.Type == "Drone" and not Settings.ESP.ShowDrones then
             espFrame.Visible = false
+            if targetData.Outline then
+                targetData.Outline.Enabled = false
+            end
+            if targetData.BoxESP then
+                targetData.BoxESP.Visible = false
+            end
             return false
         end
         
@@ -500,10 +562,20 @@ local function updateESP(targetData)
             removeChams(target)
         end
         
+        -- Обновление обводки модели
         if targetData.Outline then
             targetData.Outline.Enabled = Settings.Visuals.OutlineModels
             targetData.Outline.OutlineColor = targetData.Target.Type == "Drone" and COLORS.Warning or Settings.Visuals.ChamsColor
             targetData.Outline.FillColor = targetData.Target.Type == "Drone" and COLORS.Warning or Settings.Visuals.ChamsColor
+        end
+        
+        -- Обновление Box ESP для персонажей
+        if targetData.BoxESP and targetData.Target.Type == "Enemy" then
+            updateBoxESP(targetData.BoxESP, target, screenPos, 100)
+            targetData.BoxESP.BorderColor3 = targetData.Target.Type == "Drone" and COLORS.Warning or Settings.Visuals.ChamsColor
+            targetData.BoxESP.Visible = Settings.Visuals.OutlineModels
+        elseif targetData.BoxESP then
+            targetData.BoxESP.Visible = false
         end
         
         local infoPanel = espFrame:FindFirstChild("InfoPanel")
@@ -592,6 +664,9 @@ local function updateESP(targetData)
         if targetData.Outline then
             targetData.Outline.Enabled = false
         end
+        if targetData.BoxESP then
+            targetData.BoxESP.Visible = false
+        end
         removeChams(target)
         return false
     end
@@ -610,6 +685,9 @@ local function updateESPSystem()
             data.Frame.Visible = false
             if data.Outline then
                 data.Outline.Enabled = false
+            end
+            if data.BoxESP then
+                data.BoxESP.Visible = false
             end
             removeChams(target)
         end
@@ -631,6 +709,9 @@ local function updateESPSystem()
             data.Frame:Destroy()
             if data.Outline then
                 data.Outline:Destroy()
+            end
+            if data.BoxESP then
+                data.BoxESP:Destroy()
             end
             removeChams(target)
             espCache[target] = nil
@@ -852,7 +933,6 @@ local function createColorEditor()
     editorStroke.Thickness = 2
     editorStroke.Parent = colorEditor
     
-    -- Маленькая кнопка закрытия в левом верхнем углу
     local closeButton = Instance.new("TextButton")
     closeButton.Text = "×"
     closeButton.Size = UDim2.new(0, 25, 0, 25)
@@ -904,7 +984,6 @@ local function createColorEditor()
     previewStroke.Thickness = 2
     previewStroke.Parent = colorPreview
     
-    -- Основная палитра цветов
     local colorPalette = Instance.new("Frame")
     colorPalette.Size = UDim2.new(1, -20, 0, 200)
     colorPalette.Position = UDim2.new(0, 10, 0, 80)
@@ -912,37 +991,28 @@ local function createColorEditor()
     colorPalette.ZIndex = 101
     colorPalette.Parent = colorEditor
     
-    -- Создаем палитру 8x8 цветов
     local colors = {
-        -- Красные оттенки
         Color3.fromRGB(255, 0, 0), Color3.fromRGB(255, 50, 50), Color3.fromRGB(255, 100, 100), Color3.fromRGB(255, 150, 150),
         Color3.fromRGB(200, 0, 0), Color3.fromRGB(200, 50, 50), Color3.fromRGB(200, 100, 100), Color3.fromRGB(200, 150, 150),
         
-        -- Зеленые оттенки
         Color3.fromRGB(0, 255, 0), Color3.fromRGB(50, 255, 50), Color3.fromRGB(100, 255, 100), Color3.fromRGB(150, 255, 150),
         Color3.fromRGB(0, 200, 0), Color3.fromRGB(50, 200, 50), Color3.fromRGB(100, 200, 100), Color3.fromRGB(150, 200, 150),
         
-        -- Синие оттенки
         Color3.fromRGB(0, 0, 255), Color3.fromRGB(50, 50, 255), Color3.fromRGB(100, 100, 255), Color3.fromRGB(150, 150, 255),
         Color3.fromRGB(0, 0, 200), Color3.fromRGB(50, 50, 200), Color3.fromRGB(100, 100, 200), Color3.fromRGB(150, 150, 200),
         
-        -- Желтые/Оранжевые
         Color3.fromRGB(255, 255, 0), Color3.fromRGB(255, 200, 0), Color3.fromRGB(255, 150, 0), Color3.fromRGB(255, 100, 0),
         Color3.fromRGB(200, 200, 0), Color3.fromRGB(200, 150, 0), Color3.fromRGB(200, 100, 0), Color3.fromRGB(200, 50, 0),
         
-        -- Пурпурные/Розовые
         Color3.fromRGB(255, 0, 255), Color3.fromRGB(255, 50, 200), Color3.fromRGB(255, 100, 150), Color3.fromRGB(255, 150, 200),
         Color3.fromRGB(200, 0, 200), Color3.fromRGB(200, 50, 150), Color3.fromRGB(200, 100, 100), Color3.fromRGB(200, 150, 150),
         
-        -- Голубые/Бирюзовые
         Color3.fromRGB(0, 255, 255), Color3.fromRGB(50, 255, 200), Color3.fromRGB(100, 255, 150), Color3.fromRGB(150, 255, 200),
         Color3.fromRGB(0, 200, 200), Color3.fromRGB(50, 200, 150), Color3.fromRGB(100, 200, 100), Color3.fromRGB(150, 200, 150),
         
-        -- Фиолетовые
         Color3.fromRGB(128, 0, 255), Color3.fromRGB(150, 50, 255), Color3.fromRGB(180, 100, 255), Color3.fromRGB(200, 150, 255),
         Color3.fromRGB(100, 0, 200), Color3.fromRGB(120, 50, 200), Color3.fromRGB(150, 100, 200), Color3.fromRGB(180, 150, 200),
         
-        -- Серые/Белые/Черные
         Color3.fromRGB(255, 255, 255), Color3.fromRGB(200, 200, 200), Color3.fromRGB(150, 150, 150), Color3.fromRGB(100, 100, 100),
         Color3.fromRGB(50, 50, 50), Color3.fromRGB(0, 0, 0), Color3.fromRGB(128, 128, 128), Color3.fromRGB(180, 180, 180)
     }
@@ -1037,7 +1107,6 @@ local function createColorEditor()
         end)
     end
     
-    -- Добавляем возможность закрытия по ESC
     UserInputService.InputBegan:Connect(function(input, gameProcessed)
         if gameProcessed then return end
         
