@@ -21,7 +21,6 @@ local lastUpdate = 0
 local UPDATE_INTERVAL = 0.033
 
 local camera = workspace.CurrentCamera
-local teamsFolder = workspace:FindFirstChild("teems__")  -- Исправлено на teems__
 
 local Settings = {
     ESP = {
@@ -67,7 +66,7 @@ local function createGUI()
     end
     
     screenGui = Instance.new("ScreenGui")
-    screenGui.Name = "WinterESP"
+    screenGui.Name = "ESP"
     screenGui.Parent = CoreGui
     screenGui.DisplayOrder = 999
     screenGui.ResetOnSpawn = false
@@ -75,173 +74,52 @@ local function createGUI()
     return screenGui
 end
 
-local function getPlayerTeam(character)
-    if not character or not character.Parent then 
-        return nil 
-    end
+local function findTargets()
+    local targets = {}
+    local localCharacter = localPlayer.Character
     
-    if not teamsFolder then
-        teamsFolder = workspace:FindFirstChild("teems__")  -- Исправлено на teems__
-        if not teamsFolder then return nil end
-    end
-    
-    for _, teamModel in pairs(teamsFolder:GetChildren()) do
-        if teamModel:IsA("Model") and (teamModel.Name:lower() == "attackers" or teamModel.Name:lower() == "defenders") then
-            for _, player in pairs(teamModel:GetChildren()) do
-                if player:IsA("Model") and player.Name == character.Name then
-                    local humanoid = player:FindFirstChildOfClass("Humanoid")
-                    if humanoid then
-                        return teamModel.Name
-                    end
-                end
-            end
-        end
-    end
-    
-    return nil
-end
-
-local function getOppositeTeam(myTeam)
-    if myTeam:lower() == "defenders" then
-        return "attackers"
-    elseif myTeam:lower() == "attackers" then
-        return "defenders"
-    end
-    return nil
-end
-
-local function findFPVDrones()
-    local drones = {}
-    
-    local droneModel = workspace:FindFirstChild("2bba961d-890f-4230-b386-783adeb648ce")
-    if droneModel and droneModel:IsA("Model") then
-        for _, child in pairs(droneModel:GetChildren()) do
-            if child:IsA("Model") then
-                local rootPart = child:FindFirstChild("HumanoidRootPart") or child:FindFirstChild("Head") or child.PrimaryPart
-                if not rootPart then
-                    for _, part in pairs(child:GetDescendants()) do
-                        if part:IsA("BasePart") then
-                            rootPart = part
-                            break
-                        end
-                    end
-                end
-                
-                if rootPart then
-                    local isFlying = rootPart.Position.Y > 5 or rootPart.AssemblyLinearVelocity.Magnitude > 1
-                    if isFlying and not drones[child] then
-                        drones[child] = {
-                            Object = child,
-                            Type = "Drone",
-                            Name = "FPV Дрон",
-                            RootPart = rootPart
-                        }
-                    end
-                end
-            end
-        end
-    end
-    
-    for _, obj in pairs(workspace:GetChildren()) do
-        if obj:IsA("Model") then
-            local nameLower = obj.Name:lower()
-            if nameLower:find("drone") or nameLower:find("fpv") or nameLower:find("quadcopter") or nameLower:find("uav") then
-                local rootPart = obj:FindFirstChild("HumanoidRootPart") or obj:FindFirstChild("Head") or obj.PrimaryPart
-                if not rootPart then
-                    for _, part in pairs(obj:GetDescendants()) do
-                        if part:IsA("BasePart") then
-                            rootPart = part
-                            break
-                        end
-                    end
-                end
-                
-                if rootPart and not drones[obj] then
-                    local isFlying = rootPart.Position.Y > 5 or rootPart.AssemblyLinearVelocity.Magnitude > 1
-                    if isFlying then
-                        drones[obj] = {
-                            Object = obj,
-                            Type = "Drone", 
-                            Name = "FPV Дрон",
-                            RootPart = rootPart
-                        }
-                    end
-                end
-            end
-            
-            for _, part in pairs(obj:GetDescendants()) do
-                if part:IsA("BasePart") then
-                    local partNameLower = part.Name:lower()
-                    if partNameLower:find("fpv") or partNameLower:find("camera") or partNameLower:find("rotor") or partNameLower:find("propeller") then
-                        local parentModel = part:FindFirstAncestorOfClass("Model")
-                        if parentModel and not drones[parentModel] then
-                            local rootPart = parentModel:FindFirstChild("HumanoidRootPart") or parentModel.PrimaryPart or part
-                            if rootPart then
-                                local isFlying = rootPart.Position.Y > 5 or rootPart.AssemblyLinearVelocity.Magnitude > 1
-                                if isFlying then
-                                    drones[parentModel] = {
-                                        Object = parentModel,
-                                        Type = "Drone",
-                                        Name = "FPV Дрон",
-                                        RootPart = rootPart
-                                    }
-                                end
-                            end
-                        end
-                    end
-                end
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= localPlayer and player.Character then
+            local character = player.Character
+            local humanoid = character:FindFirstChildOfClass("Humanoid")
+            if humanoid and humanoid.Health > 0 then
+                targets[character] = {
+                    Object = character,
+                    Type = "Enemy",
+                    Name = player.Name
+                }
             end
         end
     end
     
     if Settings.ESP.ShowDrones then
-        local droneCount = 0
-        for _ in pairs(drones) do
-            droneCount = droneCount + 1
-        end
-        if droneCount > 0 then
-            print("🔍 Найдено FPV дронов: " .. droneCount)
-        end
-    end
-    
-    return drones
-end
-
-local function findTargets()
-    local targets = {}
-    local localCharacter = localPlayer.Character
-    
-    if not localCharacter then 
-        return targets 
-    end
-    
-    local myTeam = getPlayerTeam(localCharacter)
-    
-    if myTeam then
-        local enemyTeam = getOppositeTeam(myTeam)
-        if enemyTeam and teamsFolder then
-            local enemyTeamModel = teamsFolder:FindFirstChild(enemyTeam)
-            if enemyTeamModel and enemyTeamModel:IsA("Model") then
-                for _, character in pairs(enemyTeamModel:GetChildren()) do
-                    if character:IsA("Model") and character ~= localCharacter then
-                        local humanoid = character:FindFirstChildOfClass("Humanoid")
-                        if humanoid and humanoid.Health > 0 then
-                            targets[character] = {
-                                Object = character,
-                                Type = "Enemy",
-                                Name = character.Name
+        for _, obj in pairs(workspace:GetChildren()) do
+            if obj:IsA("Model") then
+                local nameLower = obj.Name:lower()
+                if nameLower:find("drone") or nameLower:find("fpv") or nameLower:find("quadcopter") or nameLower:find("uav") then
+                    local rootPart = obj:FindFirstChild("HumanoidRootPart") or obj:FindFirstChild("Head") or obj.PrimaryPart
+                    if not rootPart then
+                        for _, part in pairs(obj:GetDescendants()) do
+                            if part:IsA("BasePart") then
+                                rootPart = part
+                                break
+                            end
+                        end
+                    end
+                    
+                    if rootPart and not targets[obj] then
+                        local isFlying = rootPart.Position.Y > 5 or rootPart.AssemblyLinearVelocity.Magnitude > 1
+                        if isFlying then
+                            targets[obj] = {
+                                Object = obj,
+                                Type = "Drone",
+                                Name = "FPV Дрон",
+                                RootPart = rootPart
                             }
                         end
                     end
                 end
             end
-        end
-    end
-    
-    if Settings.ESP.ShowDrones then
-        local drones = findFPVDrones()
-        for drone, droneData in pairs(drones) do
-            targets[drone] = droneData
         end
     end
     
@@ -311,11 +189,11 @@ local function createModelOutline(target)
     highlight.Name = "ESP_Outline"
     highlight.Adornee = target.Object
     highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-    highlight.FillTransparency = 1.0  -- Полностью прозрачная заливка
+    highlight.FillTransparency = 1.0
     highlight.OutlineColor = target.Type == "Drone" and COLORS.Warning or Settings.Visuals.ChamsColor
     highlight.OutlineTransparency = 0
     highlight.FillColor = target.Type == "Drone" and COLORS.Warning or Settings.Visuals.ChamsColor
-    highlight.Parent = screenGui  -- Родитель должен быть ScreenGui
+    highlight.Parent = screenGui
     
     return highlight
 end
@@ -377,10 +255,8 @@ local function createESP(target)
     espFrame.Visible = false
     espFrame.Parent = screenGui
     
-    -- Создаем обводку для модели
     local outline = Settings.Visuals.OutlineModels and createModelOutline(target)
     
-    -- Создаем Box ESP
     local boxESP = createBoxESP(target)
     
     if Settings.Visuals.Chams then
@@ -562,14 +438,12 @@ local function updateESP(targetData)
             removeChams(target)
         end
         
-        -- Обновление обводки модели
         if targetData.Outline then
             targetData.Outline.Enabled = Settings.Visuals.OutlineModels
             targetData.Outline.OutlineColor = targetData.Target.Type == "Drone" and COLORS.Warning or Settings.Visuals.ChamsColor
             targetData.Outline.FillColor = targetData.Target.Type == "Drone" and COLORS.Warning or Settings.Visuals.ChamsColor
         end
         
-        -- Обновление Box ESP для персонажей
         if targetData.BoxESP and targetData.Target.Type == "Enemy" then
             updateBoxESP(targetData.BoxESP, target, screenPos, 100)
             targetData.BoxESP.BorderColor3 = targetData.Target.Type == "Drone" and COLORS.Warning or Settings.Visuals.ChamsColor
@@ -1149,7 +1023,7 @@ local function createCheatMenu()
     end
     
     local mainFrameInstance = Instance.new("Frame")
-    mainFrameInstance.Name = "WinterESP"
+    mainFrameInstance.Name = "ESP"
     mainFrameInstance.Size = UDim2.new(0, 350, 0, 500)
     mainFrameInstance.Position = UDim2.new(0.02, 0, 0.02, 0)
     mainFrameInstance.BackgroundColor3 = COLORS.Background
@@ -1474,7 +1348,7 @@ local function main()
         updateFOV()
     end)
     
-    print("🟢 vrv1k & lfr script. загружена!")
+    print("🟢 ESP загружена!")
     print("🎮 Горячие клавиши:")
     print("   ESC - Показать/скрыть меню")
     print("   INSERT - Включить/выключить ESP")
