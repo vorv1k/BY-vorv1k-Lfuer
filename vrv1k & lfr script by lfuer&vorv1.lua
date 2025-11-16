@@ -21,7 +21,7 @@ local lastUpdate = 0
 local UPDATE_INTERVAL = 0.033
 
 local camera = workspace.CurrentCamera
-local teamsFolder = workspace:FindFirstChild("___teams_")
+local teamsFolder = workspace:FindFirstChild("teems__")  -- Исправлено на teems__
 
 local Settings = {
     ESP = {
@@ -81,7 +81,7 @@ local function getPlayerTeam(character)
     end
     
     if not teamsFolder then
-        teamsFolder = workspace:FindFirstChild("___teams_")
+        teamsFolder = workspace:FindFirstChild("teems__")  -- Исправлено на teems__
         if not teamsFolder then return nil end
     end
     
