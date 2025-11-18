@@ -22,6 +22,11 @@ local UPDATE_INTERVAL = 0.033
 
 local camera = workspace.CurrentCamera
 
+-- Переменные для работы с командами
+local teamsModel = nil
+local localPlayerTeam = nil
+local enemyTeams = {}
+
 local Settings = {
     ESP = {
         Enabled = true,
@@ -60,6 +65,79 @@ local COLORS = {
     Error = Color3.fromRGB(255, 100, 100)
 }
 
+-- Функции для работы с командами
+local function findTeamsModel()
+    teamsModel = workspace:FindFirstChild("teams__")
+    if not teamsModel then
+        teamsModel = workspace:FindFirstChild("Teams")
+        if not teamsModel then
+            for _, obj in pairs(workspace:GetChildren()) do
+                if obj.Name:lower():find("team") then
+                    teamsModel = obj
+                    break
+                end
+            end
+        end
+    end
+    return teamsModel
+end
+
+local function getPlayerTeam(player)
+    if not teamsModel then return nil end
+    
+    for _, teamFolder in pairs(teamsModel:GetChildren()) do
+        for _, playerObj in pairs(teamFolder:GetChildren()) do
+            if playerObj:IsA("ObjectValue") and playerObj.Value == player then
+                return teamFolder
+            elseif playerObj.Name == player.Name then
+                return teamFolder
+            end
+        end
+        
+        if teamFolder:FindFirstChild(player.Name) then
+            return teamFolder
+        end
+    end
+    
+    return nil
+end
+
+local function updateTeams()
+    if not findTeamsModel() then
+        return
+    end
+    
+    localPlayerTeam = getPlayerTeam(localPlayer)
+    
+    enemyTeams = {}
+    
+    for _, teamFolder in pairs(teamsModel:GetChildren()) do
+        if teamFolder ~= localPlayerTeam then
+            table.insert(enemyTeams, teamFolder)
+        end
+    end
+    
+    print("🔄 Обновление команд:")
+    print("   Моя команда: " .. (localPlayerTeam and localPlayerTeam.Name or "Не определена"))
+    print("   Вражеские команды: " .. #enemyTeams)
+    for i, team in ipairs(enemyTeams) do
+        print("   - " .. team.Name)
+    end
+end
+
+local function isEnemyPlayer(player)
+    if not teamsModel then
+        return player ~= localPlayer
+    end
+    
+    if not localPlayerTeam then
+        return player ~= localPlayer
+    end
+    
+    local playerTeam = getPlayerTeam(player)
+    return playerTeam ~= localPlayerTeam
+end
+
 local function createGUI()
     if screenGui then
         screenGui:Destroy()
@@ -78,15 +156,18 @@ local function findTargets()
     local targets = {}
     local localCharacter = localPlayer.Character
     
+    updateTeams()
+    
     for _, player in pairs(Players:GetPlayers()) do
-        if player ~= localPlayer and player.Character then
+        if player ~= localPlayer and player.Character and isEnemyPlayer(player) then
             local character = player.Character
             local humanoid = character:FindFirstChildOfClass("Humanoid")
             if humanoid and humanoid.Health > 0 then
                 targets[character] = {
                     Object = character,
                     Type = "Enemy",
-                    Name = player.Name
+                    Name = player.Name,
+                    Player = player
                 }
             end
         end
@@ -430,6 +511,19 @@ local function updateESP(targetData)
                 targetData.BoxESP.Visible = false
             end
             return false
+        end
+        
+        if targetData.Target.Type == "Enemy" and targetData.Target.Player then
+            if not isEnemyPlayer(targetData.Target.Player) then
+                espFrame.Visible = false
+                if targetData.Outline then
+                    targetData.Outline.Enabled = false
+                end
+                if targetData.BoxESP then
+                    targetData.BoxESP.Visible = false
+                end
+                return false
+            end
         end
         
         if Settings.Visuals.Chams then
@@ -1300,6 +1394,7 @@ local function setupRespawn()
         if character:WaitForChild("Humanoid") then
             wait(1)
             camera = workspace.CurrentCamera
+            updateTeams()
         end
     end
     
@@ -1328,6 +1423,9 @@ local function setupHotkeys()
             applyXRay()
         elseif input.KeyCode == Enum.KeyCode.PageUp then
             Settings.ESP.ShowDrones = not Settings.ESP.ShowDrones
+        elseif input.KeyCode == Enum.KeyCode.R then
+            updateTeams()
+            print("🔄 Принудительное обновление команд выполнено")
         end
     end)
 end
@@ -1337,6 +1435,9 @@ local function main()
     if camera then
         originalFOV = camera.FieldOfView
     end
+    
+    findTeamsModel()
+    updateTeams()
     
     createGUI()
     createCheatMenu()
@@ -1348,6 +1449,13 @@ local function main()
         updateFOV()
     end)
     
+    spawn(function()
+        while true do
+            wait(10)
+            updateTeams()
+        end
+    end)
+    
     print("🟢 ESP загружена!")
     print("🎮 Горячие клавиши:")
     print("   ESC - Показать/скрыть меню")
@@ -1355,6 +1463,8 @@ local function main()
     print("   HOME - Включить/выключить Chams")
     print("   END - Включить/выключить X-Ray")
     print("   PAGE UP - Включить/выключить ESP дронов")
+    print("   R - Принудительное обновление команд")
+    print("🎯 Режим: Только противники (система команд)")
     print("🎨 Упрощенный редактор цветов доступен в разделе Visuals")
     print("С уважением Lfuer&Vorv1k")
 end
