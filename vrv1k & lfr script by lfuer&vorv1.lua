@@ -7,25 +7,26 @@ local HttpService = game:GetService("HttpService")
 
 local localPlayer = Players.LocalPlayer
 
-local espCache = {}
+local cache = {
+    esp = {},
+    chams = {},
+    xray = {},
+    drone = {}
+}
 local connections = {}
-local screenGui = nil
-local chamsCache = {}
-local isMinimized = false
-local isMenuVisible = true
-local mainFrame = nil
-local originalFOV = 70
-local xrayCache = {}
-local droneCache = {}
-local lastUpdate = 0
-local UPDATE_INTERVAL = 0.033
+local ui = {
+    screenGui = nil,
+    mainFrame = nil
+}
 
-local camera = workspace.CurrentCamera
-
--- Переменные для работы с командами
-local teamsModel = nil
-local localPlayerTeam = nil
-local enemyTeams = {}
+local state = {
+    isMinimized = false,
+    isMenuVisible = true,
+    originalFOV = 70,
+    lastUpdate = 0,
+    UPDATE_INTERVAL = 0.033,
+    camera = workspace.CurrentCamera
+}
 
 local Settings = {
     ESP = {
@@ -65,17 +66,17 @@ local COLORS = {
     Error = Color3.fromRGB(255, 100, 100)
 }
 
--- Функции для работы с командами
+local teamsModel = nil
+local localPlayerTeam = nil
+local enemyTeams = {}
+
 local function findTeamsModel()
-    teamsModel = workspace:FindFirstChild("teams__")
+    teamsModel = workspace:FindFirstChild("teams__") or workspace:FindFirstChild("Teams")
     if not teamsModel then
-        teamsModel = workspace:FindFirstChild("Teams")
-        if not teamsModel then
-            for _, obj in pairs(workspace:GetChildren()) do
-                if obj.Name:lower():find("team") then
-                    teamsModel = obj
-                    break
-                end
+        for _, obj in pairs(workspace:GetChildren()) do
+            if obj.Name:lower():find("team") then
+                teamsModel = obj
+                break
             end
         end
     end
@@ -86,6 +87,9 @@ local function getPlayerTeam(player)
     if not teamsModel then return nil end
     
     for _, teamFolder in pairs(teamsModel:GetChildren()) do
+        if teamFolder:FindFirstChild(player.Name) then
+            return teamFolder
+        end
         for _, playerObj in pairs(teamFolder:GetChildren()) do
             if playerObj:IsA("ObjectValue") and playerObj.Value == player then
                 return teamFolder
@@ -93,22 +97,15 @@ local function getPlayerTeam(player)
                 return teamFolder
             end
         end
-        
-        if teamFolder:FindFirstChild(player.Name) then
-            return teamFolder
-        end
     end
     
     return nil
 end
 
 local function updateTeams()
-    if not findTeamsModel() then
-        return
-    end
+    if not findTeamsModel() then return end
     
     localPlayerTeam = getPlayerTeam(localPlayer)
-    
     enemyTeams = {}
     
     for _, teamFolder in pairs(teamsModel:GetChildren()) do
@@ -116,45 +113,30 @@ local function updateTeams()
             table.insert(enemyTeams, teamFolder)
         end
     end
-    
-    print("🔄 Обновление команд:")
-    print("   Моя команда: " .. (localPlayerTeam and localPlayerTeam.Name or "Не определена"))
-    print("   Вражеские команды: " .. #enemyTeams)
-    for i, team in ipairs(enemyTeams) do
-        print("   - " .. team.Name)
-    end
 end
 
 local function isEnemyPlayer(player)
-    if not teamsModel then
-        return player ~= localPlayer
-    end
-    
-    if not localPlayerTeam then
-        return player ~= localPlayer
-    end
+    if not teamsModel then return player ~= localPlayer end
+    if not localPlayerTeam then return player ~= localPlayer end
     
     local playerTeam = getPlayerTeam(player)
     return playerTeam ~= localPlayerTeam
 end
 
 local function createGUI()
-    if screenGui then
-        screenGui:Destroy()
-    end
+    if ui.screenGui then ui.screenGui:Destroy() end
     
-    screenGui = Instance.new("ScreenGui")
-    screenGui.Name = "ESP"
-    screenGui.Parent = CoreGui
-    screenGui.DisplayOrder = 999
-    screenGui.ResetOnSpawn = false
+    ui.screenGui = Instance.new("ScreenGui")
+    ui.screenGui.Name = "ESP"
+    ui.screenGui.Parent = CoreGui
+    ui.screenGui.DisplayOrder = 999
+    ui.screenGui.ResetOnSpawn = false
     
-    return screenGui
+    return ui.screenGui
 end
 
 local function findTargets()
     local targets = {}
-    local localCharacter = localPlayer.Character
     
     updateTeams()
     
@@ -209,26 +191,21 @@ end
 
 local function applyXRay()
     if not Settings.Visuals.XRay then
-        for part, originalTransparency in pairs(xrayCache) do
+        for part, originalTransparency in pairs(cache.xray) do
             if part and part.Parent then
-                pcall(function()
-                    part.Transparency = originalTransparency
-                end)
+                pcall(function() part.Transparency = originalTransparency end)
             end
         end
-        xrayCache = {}
+        cache.xray = {}
         return
     end
     
-    local currentTime = tick()
     for _, obj in pairs(workspace:GetDescendants()) do
         if obj:IsA("BasePart") and obj.Transparency < Settings.Visuals.XRayTransparency then
-            if not xrayCache[obj] then
-                xrayCache[obj] = obj.Transparency
+            if not cache.xray[obj] then
+                cache.xray[obj] = obj.Transparency
             end
-            pcall(function()
-                obj.Transparency = Settings.Visuals.XRayTransparency
-            end)
+            pcall(function() obj.Transparency = Settings.Visuals.XRayTransparency end)
         end
     end
 end
@@ -236,9 +213,9 @@ end
 local function applyChams(target)
     if not target or not target.Parent then return end
     
-    if chamsCache[target] then
-        chamsCache[target]:Destroy()
-        chamsCache[target] = nil
+    if cache.chams[target] then
+        cache.chams[target]:Destroy()
+        cache.chams[target] = nil
     end
     
     if not Settings.Visuals.Chams then return end
@@ -253,13 +230,13 @@ local function applyChams(target)
     highlight.OutlineTransparency = 0
     highlight.Parent = target
     
-    chamsCache[target] = highlight
+    cache.chams[target] = highlight
 end
 
 local function removeChams(target)
-    if chamsCache[target] then
-        chamsCache[target]:Destroy()
-        chamsCache[target] = nil
+    if cache.chams[target] then
+        cache.chams[target]:Destroy()
+        cache.chams[target] = nil
     end
 end
 
@@ -274,7 +251,7 @@ local function createModelOutline(target)
     highlight.OutlineColor = target.Type == "Drone" and COLORS.Warning or Settings.Visuals.ChamsColor
     highlight.OutlineTransparency = 0
     highlight.FillColor = target.Type == "Drone" and COLORS.Warning or Settings.Visuals.ChamsColor
-    highlight.Parent = screenGui
+    highlight.Parent = ui.screenGui
     
     return highlight
 end
@@ -289,44 +266,13 @@ local function createBoxESP(target)
     boxFrame.BorderColor3 = target.Type == "Drone" and COLORS.Warning or Settings.Visuals.ChamsColor
     boxFrame.ZIndex = 10
     boxFrame.Visible = false
-    boxFrame.Parent = screenGui
+    boxFrame.Parent = ui.screenGui
     
     return boxFrame
 end
 
-local function smoothUpdatePosition(espFrame, targetPosition, alpha)
-    if not espFrame or not targetPosition then return end
-    
-    local currentPosition = espFrame.Position
-    
-    local newX = currentPosition.X.Offset + (targetPosition.X.Offset - currentPosition.X.Offset) * alpha
-    local newY = currentPosition.Y.Offset + (targetPosition.Y.Offset - currentPosition.Y.Offset) * alpha
-    
-    local maxSpeed = 50
-    local deltaX = newX - currentPosition.X.Offset
-    local deltaY = newY - currentPosition.Y.Offset
-    
-    if math.abs(deltaX) > maxSpeed then
-        newX = currentPosition.X.Offset + (deltaX > 0 and maxSpeed or -maxSpeed)
-    end
-    if math.abs(deltaY) > maxSpeed then
-        newY = currentPosition.Y.Offset + (deltaY > 0 and maxSpeed or -maxSpeed)
-    end
-    
-    espFrame.Position = UDim2.new(0, newX, 0, newY)
-end
-
-local function smoothHealthUpdate(healthFill, targetSize, alpha)
-    if not healthFill then return end
-    
-    local currentSize = healthFill.Size
-    local newWidth = currentSize.X.Scale + (targetSize.X.Scale - currentSize.X.Scale) * alpha
-    
-    healthFill.Size = UDim2.new(newWidth, 0, 1, 0)
-end
-
 local function createESP(target)
-    if espCache[target.Object] then return end
+    if cache.esp[target.Object] then return end
     
     local espFrame = Instance.new("Frame")
     espFrame.Name = "ESP_" .. target.Object.Name
@@ -334,10 +280,9 @@ local function createESP(target)
     espFrame.Size = UDim2.new(1, 0, 1, 0)
     espFrame.ZIndex = 10
     espFrame.Visible = false
-    espFrame.Parent = screenGui
+    espFrame.Parent = ui.screenGui
     
     local outline = Settings.Visuals.OutlineModels and createModelOutline(target)
-    
     local boxESP = createBoxESP(target)
     
     if Settings.Visuals.Chams then
@@ -409,13 +354,12 @@ local function createESP(target)
     fillCorner.CornerRadius = UDim.new(1, 0)
     fillCorner.Parent = healthFill
     
-    espCache[target.Object] = {
+    cache.esp[target.Object] = {
         Frame = espFrame,
         Target = target,
         Outline = outline,
         BoxESP = boxESP,
         LastUpdate = 0,
-        SmoothPosition = UDim2.new(0, 0, 0, 0),
         LastScreenPos = Vector2.new(0, 0),
         HealthPercent = 1.0
     }
@@ -429,8 +373,8 @@ local function updateBoxESP(boxFrame, character, screenPos, size)
     
     if not head or not rootPart then return end
     
-    local headPos, headOnScreen = camera:WorldToViewportPoint(head.Position)
-    local rootPos, rootOnScreen = camera:WorldToViewportPoint(rootPart.Position)
+    local headPos, headOnScreen = state.camera:WorldToViewportPoint(head.Position)
+    local rootPos, rootOnScreen = state.camera:WorldToViewportPoint(rootPart.Position)
     
     if not headOnScreen or not rootOnScreen then return end
     
@@ -448,12 +392,8 @@ local function updateESP(targetData)
     
     if not target or not target.Parent then
         espFrame.Visible = false
-        if targetData.Outline then
-            targetData.Outline.Enabled = false
-        end
-        if targetData.BoxESP then
-            targetData.BoxESP.Visible = false
-        end
+        if targetData.Outline then targetData.Outline.Enabled = false end
+        if targetData.BoxESP then targetData.BoxESP.Visible = false end
         removeChams(target)
         return false
     end
@@ -461,67 +401,47 @@ local function updateESP(targetData)
     local rootPart = target:FindFirstChild("HumanoidRootPart") or target:FindFirstChild("Head") or target.PrimaryPart or targetData.Target.RootPart
     if not rootPart then
         espFrame.Visible = false
-        if targetData.Outline then
-            targetData.Outline.Enabled = false
-        end
-        if targetData.BoxESP then
-            targetData.BoxESP.Visible = false
-        end
+        if targetData.Outline then targetData.Outline.Enabled = false end
+        if targetData.BoxESP then targetData.BoxESP.Visible = false end
         removeChams(target)
         return false
     end
     
     local success, screenPos, onScreen = pcall(function()
-        return camera:WorldToViewportPoint(rootPart.Position)
+        return state.camera:WorldToViewportPoint(rootPart.Position)
     end)
     
     if not success then
         espFrame.Visible = false
-        if targetData.Outline then
-            targetData.Outline.Enabled = false
-        end
-        if targetData.BoxESP then
-            targetData.BoxESP.Visible = false
-        end
+        if targetData.Outline then targetData.Outline.Enabled = false end
+        if targetData.BoxESP then targetData.BoxESP.Visible = false end
         removeChams(target)
         return false
     end
     
-    local distance = (camera.CFrame.Position - rootPart.Position).Magnitude
+    local distance = (state.camera.CFrame.Position - rootPart.Position).Magnitude
     local maxDistance = targetData.Target.Type == "Drone" and Settings.ESP.DroneDistance or Settings.ESP.MaxDistance
     
     if Settings.ESP.Enabled and onScreen and distance <= maxDistance then
         if targetData.Target.Type == "Enemy" and not Settings.ESP.ShowEnemies then
             espFrame.Visible = false
-            if targetData.Outline then
-                targetData.Outline.Enabled = false
-            end
-            if targetData.BoxESP then
-                targetData.BoxESP.Visible = false
-            end
+            if targetData.Outline then targetData.Outline.Enabled = false end
+            if targetData.BoxESP then targetData.BoxESP.Visible = false end
             return false
         end
         
         if targetData.Target.Type == "Drone" and not Settings.ESP.ShowDrones then
             espFrame.Visible = false
-            if targetData.Outline then
-                targetData.Outline.Enabled = false
-            end
-            if targetData.BoxESP then
-                targetData.BoxESP.Visible = false
-            end
+            if targetData.Outline then targetData.Outline.Enabled = false end
+            if targetData.BoxESP then targetData.BoxESP.Visible = false end
             return false
         end
         
         if targetData.Target.Type == "Enemy" and targetData.Target.Player then
             if not isEnemyPlayer(targetData.Target.Player) then
                 espFrame.Visible = false
-                if targetData.Outline then
-                    targetData.Outline.Enabled = false
-                end
-                if targetData.BoxESP then
-                    targetData.BoxESP.Visible = false
-                end
+                if targetData.Outline then targetData.Outline.Enabled = false end
+                if targetData.BoxESP then targetData.BoxESP.Visible = false end
                 return false
             end
         end
@@ -548,26 +468,9 @@ local function updateESP(targetData)
         
         local infoPanel = espFrame:FindFirstChild("InfoPanel")
         if infoPanel then
+            -- Убрана плавная анимация для мгновенного обновления позиции
             local targetPosition = UDim2.new(0, screenPos.X - 60, 0, screenPos.Y - 50)
-            
-            if targetData.SmoothPosition == UDim2.new(0, 0, 0, 0) then
-                targetData.SmoothPosition = targetPosition
-                infoPanel.Position = targetPosition
-            else
-                local alpha = 0.3
-                
-                local posDelta = math.abs(targetPosition.X.Offset - targetData.SmoothPosition.X.Offset) + 
-                               math.abs(targetPosition.Y.Offset - targetData.SmoothPosition.Y.Offset)
-                
-                if posDelta > 100 then
-                    alpha = 0.6
-                elseif posDelta > 50 then
-                    alpha = 0.4
-                end
-                
-                smoothUpdatePosition(infoPanel, targetPosition, alpha)
-                targetData.SmoothPosition = infoPanel.Position
-            end
+            infoPanel.Position = targetPosition
             
             infoPanel.Visible = Settings.ESP.ShowNames
             
@@ -586,40 +489,28 @@ local function updateESP(targetData)
                 distanceLabel.TextColor3 = targetData.Target.Type == "Drone" and COLORS.Warning or COLORS.Secondary
             end
             
-            if healthBar then
-                if targetData.Target.Type == "Enemy" then
-                    local humanoid = target:FindFirstChildOfClass("Humanoid")
-                    if humanoid and humanoid.MaxHealth > 0 then
-                        local newHealthPercent = math.clamp(humanoid.Health / humanoid.MaxHealth, 0, 1)
-                        
-                        local healthAlpha = 0.5
-                        targetData.HealthPercent = targetData.HealthPercent + (newHealthPercent - targetData.HealthPercent) * healthAlpha
-                        
-                        local healthFill = healthBar:FindFirstChild("HealthFill")
-                        if healthFill then
-                            smoothHealthUpdate(healthFill, UDim2.new(targetData.HealthPercent, 0, 1, 0), 0.8)
-                            
-                            if targetData.HealthPercent > 0.5 then
-                                healthFill.BackgroundColor3 = Color3.fromRGB(
-                                    (1 - targetData.HealthPercent) * 255 * 2,
-                                    255,
-                                    0
-                                )
-                            else
-                                healthFill.BackgroundColor3 = Color3.fromRGB(
-                                    255,
-                                    targetData.HealthPercent * 255 * 2,
-                                    0
-                                )
-                            end
+            if healthBar and targetData.Target.Type == "Enemy" then
+                local humanoid = target:FindFirstChildOfClass("Humanoid")
+                if humanoid and humanoid.MaxHealth > 0 then
+                    -- Убрана плавная анимация здоровья для мгновенного обновления
+                    local newHealthPercent = math.clamp(humanoid.Health / humanoid.MaxHealth, 0, 1)
+                    targetData.HealthPercent = newHealthPercent
+                    
+                    local healthFill = healthBar:FindFirstChild("HealthFill")
+                    if healthFill then
+                        healthFill.Size = UDim2.new(targetData.HealthPercent, 0, 1, 0)
+                        if targetData.HealthPercent > 0.5 then
+                            healthFill.BackgroundColor3 = Color3.fromRGB((1 - targetData.HealthPercent) * 255 * 2, 255, 0)
+                        else
+                            healthFill.BackgroundColor3 = Color3.fromRGB(255, targetData.HealthPercent * 255 * 2, 0)
                         end
-                        healthBar.Visible = Settings.Visuals.ShowHealth
-                    else
-                        healthBar.Visible = false
                     end
+                    healthBar.Visible = Settings.Visuals.ShowHealth
                 else
                     healthBar.Visible = false
                 end
+            else
+                if healthBar then healthBar.Visible = false end
             end
         end
         
@@ -629,12 +520,8 @@ local function updateESP(targetData)
         return true
     else
         espFrame.Visible = false
-        if targetData.Outline then
-            targetData.Outline.Enabled = false
-        end
-        if targetData.BoxESP then
-            targetData.BoxESP.Visible = false
-        end
+        if targetData.Outline then targetData.Outline.Enabled = false end
+        if targetData.BoxESP then targetData.BoxESP.Visible = false end
         removeChams(target)
         return false
     end
@@ -643,20 +530,14 @@ end
 local function updateESPSystem()
     local currentTime = tick()
     
-    if currentTime - lastUpdate < UPDATE_INTERVAL then
-        return
-    end
-    lastUpdate = currentTime
+    if currentTime - state.lastUpdate < state.UPDATE_INTERVAL then return end
+    state.lastUpdate = currentTime
     
     if not Settings.ESP.Enabled then
-        for target, data in pairs(espCache) do
+        for target, data in pairs(cache.esp) do
             data.Frame.Visible = false
-            if data.Outline then
-                data.Outline.Enabled = false
-            end
-            if data.BoxESP then
-                data.BoxESP.Visible = false
-            end
+            if data.Outline then data.Outline.Enabled = false end
+            if data.BoxESP then data.BoxESP.Visible = false end
             removeChams(target)
         end
         return
@@ -666,37 +547,31 @@ local function updateESPSystem()
     local currentTargets = {}
     
     for target, targetData in pairs(targets) do
-        if not espCache[target] then
-            createESP(targetData)
-        end
+        if not cache.esp[target] then createESP(targetData) end
         currentTargets[target] = true
     end
     
-    for target, data in pairs(espCache) do
+    for target, data in pairs(cache.esp) do
         if not currentTargets[target] then
             data.Frame:Destroy()
-            if data.Outline then
-                data.Outline:Destroy()
-            end
-            if data.BoxESP then
-                data.BoxESP:Destroy()
-            end
+            if data.Outline then data.Outline:Destroy() end
+            if data.BoxESP then data.BoxESP:Destroy() end
             removeChams(target)
-            espCache[target] = nil
+            cache.esp[target] = nil
         end
     end
     
-    for target, data in pairs(espCache) do
+    for target, data in pairs(cache.esp) do
         updateESP(data)
     end
 end
 
 local function updateFOV()
-    if camera then
+    if state.camera then
         if Settings.FOV.Enabled then
-            camera.FieldOfView = Settings.FOV.Value
+            state.camera.FieldOfView = Settings.FOV.Value
         else
-            camera.FieldOfView = originalFOV
+            state.camera.FieldOfView = state.originalFOV
         end
     end
 end
@@ -890,7 +765,7 @@ local function createColorEditor()
     colorEditor.BackgroundTransparency = 0.05
     colorEditor.Visible = false
     colorEditor.ZIndex = 100
-    colorEditor.Parent = screenGui
+    colorEditor.Parent = ui.screenGui
     
     local editorCorner = Instance.new("UICorner")
     editorCorner.CornerRadius = UDim.new(0, 15)
@@ -985,32 +860,6 @@ local function createColorEditor()
         Color3.fromRGB(50, 50, 50), Color3.fromRGB(0, 0, 0), Color3.fromRGB(128, 128, 128), Color3.fromRGB(180, 180, 180)
     }
     
-    local colorNames = {
-        "Красный", "Светло-красный", "Розовый", "Светло-розовый",
-        "Темно-красный", "Красно-оранжевый", "Коралловый", "Персиковый",
-        
-        "Зеленый", "Светло-зеленый", "Лаймовый", "Мятный",
-        "Темно-зеленый", "Оливковый", "Фисташковый", "Салатовый",
-        
-        "Синий", "Светло-синий", "Голубой", "Небесный",
-        "Темно-синий", "Сине-фиолетовый", "Лавандовый", "Серо-голубой",
-        
-        "Желтый", "Золотой", "Оранжевый", "Красно-оранжевый",
-        "Темно-желтый", "Янтарный", "Оранжево-красный", "Кирпичный",
-        
-        "Пурпурный", "Розовый", "Фуксия", "Светло-розовый",
-        "Темно-пурпурный", "Фиолетово-розовый", "Лососевый", "Кораллово-розовый",
-        
-        "Бирюзовый", "Аквамарин", "Морской волны", "Светло-бирюзовый",
-        "Темно-бирюзовый", "Зелено-голубой", "Оливково-зеленый", "Светло-зеленый",
-        
-        "Фиолетовый", "Светло-фиолетовый", "Лавандовый", "Сиреневый",
-        "Темно-фиолетовый", "Сливовый", "Серо-фиолетовый", "Светло-сиреневый",
-        
-        "Белый", "Светло-серый", "Серый", "Темно-серый",
-        "Черный", "Чистый черный", "Средне-серый", "Серебряный"
-    }
-    
     local cellSize = 35
     local spacing = 2
     local colorsPerRow = 8
@@ -1038,38 +887,14 @@ local function createColorEditor()
         cellStroke.Thickness = 1
         cellStroke.Parent = colorCell
         
-        local tooltip = Instance.new("TextLabel")
-        tooltip.Text = colorNames[i]
-        tooltip.Size = UDim2.new(0, 80, 0, 20)
-        tooltip.Position = UDim2.new(0, -40, -25, 0)
-        tooltip.BackgroundColor3 = COLORS.Surface
-        tooltip.TextColor3 = COLORS.Primary
-        tooltip.Font = Enum.Font.Gotham
-        tooltip.TextSize = 10
-        tooltip.Visible = false
-        tooltip.ZIndex = 103
-        tooltip.Parent = colorCell
-        
-        local tooltipCorner = Instance.new("UICorner")
-        tooltipCorner.CornerRadius = UDim.new(0, 4)
-        tooltipCorner.Parent = tooltip
-        
-        colorCell.MouseEnter:Connect(function()
-            tooltip.Visible = true
-        end)
-        
-        colorCell.MouseLeave:Connect(function()
-            tooltip.Visible = false
-        end)
-        
         colorCell.MouseButton1Click:Connect(function()
             Settings.Visuals.ChamsColor = colors[i]
             colorPreview.BackgroundColor3 = colors[i]
             
-            for target, _ in pairs(espCache) do
-                if chamsCache[target] then
-                    chamsCache[target].FillColor = colors[i]
-                    chamsCache[target].OutlineColor = colors[i]
+            for target, _ in pairs(cache.esp) do
+                if cache.chams[target] then
+                    cache.chams[target].FillColor = colors[i]
+                    cache.chams[target].OutlineColor = colors[i]
                 end
             end
         end)
@@ -1112,9 +937,7 @@ local function createSettingsButton(yPos, parentFrame, onClick)
 end
 
 local function createCheatMenu()
-    if mainFrame then
-        mainFrame:Destroy()
-    end
+    if ui.mainFrame then ui.mainFrame:Destroy() end
     
     local mainFrameInstance = Instance.new("Frame")
     mainFrameInstance.Name = "ESP"
@@ -1124,10 +947,10 @@ local function createCheatMenu()
     mainFrameInstance.BackgroundTransparency = 0.05
     mainFrameInstance.BorderSizePixel = 0
     mainFrameInstance.ClipsDescendants = true
-    mainFrameInstance.Visible = isMenuVisible
-    mainFrameInstance.Parent = screenGui
+    mainFrameInstance.Visible = state.isMenuVisible
+    mainFrameInstance.Parent = ui.screenGui
     
-    mainFrame = mainFrameInstance
+    ui.mainFrame = mainFrameInstance
     
     local UICorner = Instance.new("UICorner")
     UICorner.CornerRadius = UDim.new(0, 15)
@@ -1334,7 +1157,6 @@ local function createCheatMenu()
     statusLabel.TextSize = 11
     statusLabel.Parent = bottomPanel
     
-    local fpsUpdateTime = 0
     spawn(function()
         while true do
             wait(1)
@@ -1346,10 +1168,10 @@ local function createCheatMenu()
     end)
     
     minimizeButton.MouseButton1Click:Connect(function()
-        isMinimized = not isMinimized
+        state.isMinimized = not state.isMinimized
         local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
         
-        if isMinimized then
+        if state.isMinimized then
             local sizeTween = TweenService:Create(mainFrameInstance, tweenInfo, {Size = UDim2.new(0, 350, 0, 70)})
             sizeTween:Play()
             contentContainer.Visible = false
@@ -1393,7 +1215,7 @@ local function setupRespawn()
     local function onCharacterAdded(character)
         if character:WaitForChild("Humanoid") then
             wait(1)
-            camera = workspace.CurrentCamera
+            state.camera = workspace.CurrentCamera
             updateTeams()
         end
     end
@@ -1410,9 +1232,9 @@ local function setupHotkeys()
         if gameProcessed then return end
         
         if input.KeyCode == Enum.KeyCode.Escape then
-            isMenuVisible = not isMenuVisible
-            if mainFrame then
-                mainFrame.Visible = isMenuVisible
+            state.isMenuVisible = not state.isMenuVisible
+            if ui.mainFrame then
+                ui.mainFrame.Visible = state.isMenuVisible
             end
         elseif input.KeyCode == Enum.KeyCode.Insert then
             Settings.ESP.Enabled = not Settings.ESP.Enabled
@@ -1425,15 +1247,14 @@ local function setupHotkeys()
             Settings.ESP.ShowDrones = not Settings.ESP.ShowDrones
         elseif input.KeyCode == Enum.KeyCode.R then
             updateTeams()
-            print("🔄 Принудительное обновление команд выполнено")
         end
     end)
 end
 
 local function main()
-    camera = workspace.CurrentCamera
-    if camera then
-        originalFOV = camera.FieldOfView
+    state.camera = workspace.CurrentCamera
+    if state.camera then
+        state.originalFOV = state.camera.FieldOfView
     end
     
     findTeamsModel()
